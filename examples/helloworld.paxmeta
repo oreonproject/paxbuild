@@ -1,0 +1,20 @@
+name: hello-world
+version: 1.0.0
+description: A simple hello world package
+source: https://github.com/rust-lang/rust/archive/refs/heads/master.tar.gz
+
+# Simple build script that creates a hello world binary
+build: |
+  echo "Building hello world package..."
+  mkdir -p $PAX_BUILD_ROOT/usr/bin
+  echo '#!/bin/bash' > $PAX_BUILD_ROOT/usr/bin/hello-world
+  echo 'echo "Hello, World from PAXBuild!"' >> $PAX_BUILD_ROOT/usr/bin/hello-world
+  chmod +x $PAX_BUILD_ROOT/usr/bin/hello-world
+
+# Post-install script
+install: |
+  echo "Hello world package installed successfully"
+
+# Post-uninstall script
+uninstall: |
+  echo "Hello world package uninstalled"

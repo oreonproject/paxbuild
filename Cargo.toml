@@ -1,0 +1,28 @@
+[workspace]
+
+[package]
+name = "paxbuild"
+version = "0.1.0"
+edition = "2021"
+description = "PAX package builder - builds .pax packages from .paxmeta recipes"
+authors = ["PAX Team"]
+license = "MIT"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+reqwest = { version = "0.12", features = ["blocking"] }
+tar = "0.4"
+flate2 = "1.0"
+zstd = "0.13"
+sha2 = "0.10"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+tempfile = "3.0"
+clap = { version = "4.0", features = ["derive"] }
+indicatif = "0.17"
+walkdir = "2.5"
+hex = "0.4"
+anyhow = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+rand = "0.8"
