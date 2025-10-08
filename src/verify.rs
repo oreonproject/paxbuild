@@ -24,8 +24,37 @@ pub fn verify_package(package_path: &str, key_path: Option<&str>) -> Result<()> 
     // Verify signature if key provided
     if let Some(key) = key_path {
         println!("Verifying signature with key: {}", key);
-        // TODO: Implement signature verification
-        println!("Signature verification not yet implemented");
+
+        // Look for signature file (package.sig or package.signature)
+        let signature_path = format!("{}.sig", package_path);
+        let signature_path_alt = format!("{}.signature", package_path);
+
+        let signature_path = if std::path::Path::new(&signature_path).exists() {
+            signature_path
+        } else if std::path::Path::new(&signature_path_alt).exists() {
+            signature_path_alt
+        } else {
+            println!("Warning: No signature file found (expected {}.sig or {}.signature)", package_path, package_path);
+            return Ok(());
+        };
+
+        // Read signature
+        let signature = std::fs::read(&signature_path)
+            .with_context(|| format!("Failed to read signature file: {}", signature_path))?;
+
+        // Verify signature using crypto module
+        let is_valid = crate::crypto::verify_package_signature(
+            std::path::Path::new(package_path),
+            &signature,
+            std::path::Path::new(key),
+        )?;
+
+        if is_valid {
+            println!("✓ Package signature is valid");
+        } else {
+            println!("✗ Package signature is invalid");
+            anyhow::bail!("Package signature verification failed");
+        }
     }
     
     // Calculate and display hash

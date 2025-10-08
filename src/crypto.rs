@@ -109,6 +109,55 @@ pub fn load_key_pair(
     Ok((private_key, public_key))
 }
 
+/// Get key fingerprint for identification
+pub fn get_key_fingerprint(key_bytes: &[u8]) -> Result<String> {
+    use sha2::{Digest, Sha256};
+
+    if key_bytes.len() != 32 {
+        anyhow::bail!("Invalid key length for fingerprint: {}", key_bytes.len());
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(key_bytes);
+    let fingerprint = hasher.finalize();
+
+    Ok(hex::encode(fingerprint))
+}
+
+/// Validate key format and return key type
+pub fn validate_key(key_path: &Path) -> Result<String> {
+    let key_data = fs::read_to_string(key_path)
+        .with_context(|| format!("Failed to read key file: {}", key_path.display()))?;
+
+    let key_bytes = hex::decode(key_data.trim())
+        .with_context(|| format!("Failed to decode key hex in: {}", key_path.display()))?;
+
+    if key_bytes.len() != 32 {
+        anyhow::bail!("Invalid key length: expected 32 bytes, got {}", key_bytes.len());
+    }
+
+    // Try to parse as both key types to determine which one it is
+    if SigningKey::from_bytes(&key_bytes.try_into().unwrap_or([0u8; 32])).to_bytes() == key_bytes {
+        Ok("private".to_string())
+    } else if VerifyingKey::from_bytes(&key_bytes.try_into().unwrap_or([0u8; 32])).to_bytes() == key_bytes {
+        Ok("public".to_string())
+    } else {
+        anyhow::bail!("Key data does not match either private or public key format");
+    }
+}
+
+/// Check if a key pair matches (public key derived from private key)
+pub fn validate_key_pair(private_key_path: &Path, public_key_path: &Path) -> Result<bool> {
+    let (private_key, public_key) = load_key_pair(private_key_path, public_key_path)?;
+
+    let signing_key = SigningKey::from_bytes(&private_key.try_into()
+        .map_err(|_| anyhow::anyhow!("Invalid private key length"))?);
+
+    let derived_public_key = signing_key.verifying_key().to_bytes();
+
+    Ok(derived_public_key.as_ref() == public_key.as_slice())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

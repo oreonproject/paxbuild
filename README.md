@@ -68,6 +68,68 @@ paxbuild extract package.pax
 paxbuild extract package.pax --output /tmp/extracted
 ```
 
+### Key Management
+
+PAXBuild provides comprehensive key management functionality for cryptographic operations:
+
+#### Generate Key Pair
+
+```bash
+# Generate a new Ed25519 key pair
+paxbuild keys generate --private private.key --public public.key
+
+# Generate with force overwrite
+paxbuild keys generate --private private.key --public public.key --force
+```
+
+#### Key Information
+
+```bash
+# Show private key information
+paxbuild keys info --key private.key --type private
+
+# Show public key information
+paxbuild keys info --key public.key --type public
+```
+
+#### List Keys
+
+```bash
+# List keys in current directory
+paxbuild keys list
+
+# List keys in specific directory
+paxbuild keys list --directory ./keys/
+```
+
+#### Export Public Key
+
+```bash
+# Export public key from private key
+paxbuild keys export --private private.key --public exported-public.key
+```
+
+#### Import Key
+
+```bash
+# Import a key from another location
+paxbuild keys import --source backup.key --dest imported.key --type private
+```
+
+#### Backup Keys
+
+```bash
+# Backup all keys from directory
+paxbuild keys backup --source ./keys/ --dest ./backup/
+```
+
+#### Key Types
+
+- **Private keys**: Used for signing packages (32 bytes Ed25519)
+- **Public keys**: Used for signature verification (32 bytes Ed25519)
+
+All keys are stored as hexadecimal strings in `.key` files.
+
 ## Recipe Format (.paxmeta)
 
 PAXBuild uses YAML recipe files to define how to build packages:
