@@ -12,14 +12,20 @@ sudo cp target/release/paxbuild /usr/local/bin/
 ### Build a Package
 
 ```bash
-# Build from local recipe file
-paxbuild build package.paxmeta
-
 # Build from URL
 paxbuild build https://example.com/package.paxmeta
 
-# Build with custom output path
-paxbuild build package.paxmeta --output /tmp/my-package.pax
+# Build for specific architecture
+paxbuild build package.paxmeta --arch x86_64
+
+# Build for multiple architectures
+paxbuild build package.paxmeta --arch x86_64 --arch aarch64
+
+# Build with custom output path (for single architecture)
+paxbuild build package.paxmeta --arch x86_64 --output /tmp/my-package-x86_64.pax
+
+# Build with custom output directory (for multiple architectures)
+paxbuild build package.paxmeta --arch x86_64 --arch aarch64 --output /tmp/packages/
 
 # Verbose output
 paxbuild build package.paxmeta --verbose
@@ -115,6 +121,32 @@ The build script has access to these environment variables:
 - `PAX_ARCH`: Target architecture
 - `PAX_SOURCE_DIR`: Source directory
 - `PAX_BUILD_DIR`: Build directory
+
+## Multi-Architecture Support
+
+PAXBuild supports building packages for multiple architectures in a single command:
+
+```bash
+# Build for specific architectures
+paxbuild build package.paxmeta --arch x86_64 --arch aarch64
+
+# Build for all architectures defined in recipe
+paxbuild build package.paxmeta
+
+# Supported architectures: x86_64, aarch64, armv7, i686, riscv64
+```
+
+### Package Naming
+
+Multi-architecture packages use the format: `name-version-architecture.pax`
+
+- `hello-world-1.0.0-x86_64.pax` (x86_64 architecture)
+- `hello-world-1.0.0-aarch64.pax` (ARM64 architecture)
+
+When building multiple architectures:
+- Without `--output`: Packages are created in temp directory with proper names
+- With `--output` for single architecture: Package copied to specified path
+- With `--output` for multiple architectures: Output treated as directory, each architecture gets its own file
 
 ## Package Format (.pax)
 

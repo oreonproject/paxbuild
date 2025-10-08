@@ -28,42 +28,63 @@ impl PackageBuilder {
 
     /// Build a package from a recipe
     pub fn build(&self, recipe: &BuildRecipe) -> Result<PathBuf> {
-        println!("Building package: {} {}", recipe.name, recipe.version);
-        
+        let package_paths = self.build_for_architectures(recipe, &recipe.arch)?;
+        // For backward compatibility, return the first package path
+        package_paths.into_iter().next()
+            .ok_or_else(|| anyhow::anyhow!("No packages were built"))
+    }
+
+    /// Build a package for specific architectures
+    pub fn build_for_architectures(&self, recipe: &BuildRecipe, architectures: &[String]) -> Result<Vec<PathBuf>> {
+        println!("Building package: {} {} for architectures: {:?}",
+                 recipe.name, recipe.version, architectures);
+
         // Validate recipe
         recipe.validate()?;
-        
-        // Download and extract source
+
+        if architectures.is_empty() {
+            anyhow::bail!("No architectures specified for build");
+        }
+
+        // Download and extract source once (shared across architectures)
         let source_dir = self.source_mgr.download_and_extract(
             &recipe.source,
             recipe.hash.as_deref(),
         )?;
-        
-        // Run build script
-        self.run_build_script(recipe, &source_dir)?;
-        
-        // Create package
-        let package_path = self.create_package(recipe)?;
-        
-        println!("Package built successfully: {}", package_path.display());
-        Ok(package_path)
+
+        // Build for each architecture
+        let mut package_paths = Vec::new();
+        for target_arch in architectures {
+            println!("Building for architecture: {}", target_arch);
+
+            // Run build script for specific architecture
+            self.run_build_script_for_arch(recipe, &source_dir, target_arch)?;
+
+            // Create package for specific architecture
+            let package_path = self.create_package_for_arch(recipe, target_arch)?;
+            println!("Package created: {}", package_path.display());
+            package_paths.push(package_path);
+        }
+
+        println!("All architecture-specific packages built in temp directory");
+        Ok(package_paths)
     }
 
-    /// Run the build script
-    fn run_build_script(&self, recipe: &BuildRecipe, source_dir: &Path) -> Result<()> {
-        println!("Running build script...");
-        
+    /// Run the build script for a specific architecture
+    fn run_build_script_for_arch(&self, recipe: &BuildRecipe, source_dir: &Path, arch: &str) -> Result<()> {
+        println!("Running build script for architecture: {}...", arch);
+
         let build_dir = self.temp_dir.path().join("build");
         let install_dir = self.temp_dir.path().join("install");
-        
+
         fs::create_dir_all(&build_dir)
             .with_context(|| "Failed to create build directory")?;
         fs::create_dir_all(&install_dir)
             .with_context(|| "Failed to create install directory")?;
-        
+
         let build_script = recipe.get_build_script();
-        
-        // Set up environment variables
+
+        // Set up environment variables with target architecture
         let mut cmd = Command::new("bash");
         cmd.arg("-c")
             .arg(&build_script)
@@ -71,56 +92,58 @@ impl PackageBuilder {
             .env("PAX_BUILD_ROOT", &install_dir)
             .env("PAX_PACKAGE_NAME", &recipe.name)
             .env("PAX_PACKAGE_VERSION", &recipe.version)
-            .env("PAX_ARCH", std::env::consts::ARCH)
+            .env("PAX_ARCH", arch)
+            .env("PAX_TARGET_ARCH", arch)
             .env("PAX_SOURCE_DIR", source_dir)
             .env("PAX_BUILD_DIR", &build_dir);
-        
+
         let output = cmd.output()
-            .with_context(|| "Failed to run build command")?;
-        
+            .with_context(|| format!("Failed to run build command for architecture {}", arch))?;
+
         if !output.status.success() {
-            println!("Build output:");
+            println!("Build output for {}:", arch);
             println!("{}", String::from_utf8_lossy(&output.stdout));
-            println!("Build errors:");
+            println!("Build errors for {}:", arch);
             println!("{}", String::from_utf8_lossy(&output.stderr));
-            anyhow::bail!("Build script failed");
+            anyhow::bail!("Build script failed for architecture {}", arch);
         }
-        
-        println!("Build completed successfully");
+
+        println!("Build completed successfully for architecture: {}", arch);
         Ok(())
     }
 
-    /// Create the .pax package
-    fn create_package(&self, recipe: &BuildRecipe) -> Result<PathBuf> {
-        println!("Creating package...");
-        
+    /// Create the .pax package for a specific architecture
+    fn create_package_for_arch(&self, recipe: &BuildRecipe, arch: &str) -> Result<PathBuf> {
+        println!("Creating package for architecture: {}...", arch);
+
         let package_dir = self.temp_dir.path().join("package");
         fs::create_dir_all(&package_dir)
             .with_context(|| "Failed to create package directory")?;
-        
+
         // Copy installed files to package directory
         let install_dir = self.temp_dir.path().join("install");
         if install_dir.exists() {
             self.copy_directory(&install_dir, &package_dir)?;
         }
-        
+
         // Create package metadata file (not .paxmeta, but actual package metadata)
         let metadata_path = package_dir.join("metadata.yaml");
-        let metadata_content = self.create_package_metadata(recipe)?;
+        let metadata_content = self.create_package_metadata_for_arch(recipe, arch)?;
         fs::write(&metadata_path, metadata_content)
             .with_context(|| "Failed to write metadata file")?;
-        
-        // Create the .pax package (zstd-compressed tarball)
-        let package_path = self.temp_dir.path().join(recipe.package_filename());
+
+        // Create the .pax package (zstd-compressed tarball) with architecture in filename
+        let package_filename = recipe.package_filename_for_arch(arch);
+        let package_path = self.temp_dir.path().join(package_filename);
         self.create_tarball(&package_dir, &package_path)?;
-        
+
         Ok(package_path)
     }
     
-    /// Create package metadata for the installed package
-    fn create_package_metadata(&self, recipe: &BuildRecipe) -> Result<String> {
+    /// Create package metadata for the installed package for a specific architecture
+    fn create_package_metadata_for_arch(&self, recipe: &BuildRecipe, arch: &str) -> Result<String> {
         use serde_yaml;
-        
+
         #[derive(serde::Serialize)]
         struct PackageMetadata {
             name: String,
@@ -135,7 +158,7 @@ impl PackageBuilder {
             uninstall_script: Option<String>,
             files: Vec<String>,
         }
-        
+
         // List all files in the package
         let install_dir = self.temp_dir.path().join("install");
         let files = if install_dir.exists() {
@@ -143,12 +166,12 @@ impl PackageBuilder {
         } else {
             Vec::new()
         };
-        
+
         let metadata = PackageMetadata {
             name: recipe.name.clone(),
             version: recipe.version.clone(),
             description: recipe.description.clone(),
-            arch: recipe.arch.clone(),
+            arch: vec![arch.to_string()], // Only include the target architecture
             dependencies: recipe.dependencies.clone(),
             runtime_dependencies: recipe.runtime_dependencies.clone(),
             provides: if recipe.provides.is_empty() {
@@ -161,7 +184,7 @@ impl PackageBuilder {
             uninstall_script: recipe.uninstall.clone(),
             files,
         };
-        
+
         serde_yaml::to_string(&metadata)
             .with_context(|| "Failed to serialize package metadata")
     }

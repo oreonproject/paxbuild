@@ -19,6 +19,9 @@ enum Commands {
         /// Output path for the generated .pax package
         #[arg(short, long)]
         output: Option<String>,
+        /// Target architecture(s) - can specify multiple (if not specified, builds for all architectures in recipe)
+        #[arg(short, long)]
+        arch: Vec<String>,
         /// Verbose output
         #[arg(short, long)]
         verbose: bool,
@@ -61,8 +64,8 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Build { recipe, output, verbose } => {
-            build::build_package(&recipe, output.as_deref(), verbose)?;
+        Commands::Build { recipe, output, arch, verbose } => {
+            build::build_package(&recipe, output.as_deref(), &arch, verbose)?;
         }
         Commands::Verify { package, key } => {
             verify::verify_package(&package, key.as_deref())?;

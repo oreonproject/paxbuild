@@ -8,20 +8,34 @@ pub fn show_info(package_path: &str) -> Result<()> {
     println!();
     
     let mut package = PaxPackage::open(package_path)?;
-    
-    // Get package info first
+
+    // Get package info first (immutable borrows)
     let size = package.size()?;
     let hash = package.calculate_hash()?;
-    
-    // Load metadata
+    let filename = package.filename().map(|s| s.to_string());
+    let package_info = package.parse_package_info();
+
+    // Load metadata (mutable borrow)
     let metadata = package.load_metadata()?;
-    
+
     // Display package information
     println!("Package Information:");
     println!("  Name: {}", metadata.name);
     println!("  Version: {}", metadata.version);
     println!("  Description: {}", metadata.description);
     println!("  Architectures: {:?}", metadata.arch);
+
+    // Display filename information if available
+    if let Some(filename) = filename {
+        println!("  Filename: {}", filename);
+    }
+
+    if let Some((name, version, arch)) = package_info {
+        println!("  Parsed from filename:");
+        println!("    Name: {}", name);
+        println!("    Version: {}", version);
+        println!("    Architecture: {}", arch);
+    }
     
     if !metadata.dependencies.is_empty() {
         println!("  Dependencies: {:?}", metadata.dependencies);

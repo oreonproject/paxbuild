@@ -124,6 +124,30 @@ impl PaxPackage {
         self.path.file_name()?.to_str()
     }
 
+    /// Parse package information from filename (name-version-arch.pax format)
+    pub fn parse_package_info(&self) -> Option<(String, String, String)> {
+        if let Some(filename) = self.filename() {
+            crate::recipe::BuildRecipe::parse_package_filename(filename)
+        } else {
+            None
+        }
+    }
+
+    /// Get package name from filename
+    pub fn package_name(&self) -> Option<String> {
+        self.parse_package_info().map(|(name, _, _)| name)
+    }
+
+    /// Get package version from filename
+    pub fn package_version(&self) -> Option<String> {
+        self.parse_package_info().map(|(_, version, _)| version)
+    }
+
+    /// Get package architecture from filename
+    pub fn package_arch(&self) -> Option<String> {
+        self.parse_package_info().map(|(_, _, arch)| arch)
+    }
+
     /// Get package size
     pub fn size(&self) -> Result<u64> {
         let metadata = fs::metadata(&self.path)
