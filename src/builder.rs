@@ -17,14 +17,15 @@ impl PackageBuilder {
     pub fn new() -> Result<Self> {
         let temp_dir = TempDir::new()
             .with_context(|| "Failed to create temporary directory")?;
-        
+
         let source_mgr = SourceManager::new()?;
-        
+
         Ok(PackageBuilder {
             temp_dir,
             source_mgr,
         })
     }
+
 
     /// Build a package from a recipe
     pub fn build(&self, recipe: &BuildRecipe) -> Result<PathBuf> {
@@ -63,6 +64,8 @@ impl PackageBuilder {
             // Create package for specific architecture
             let package_path = self.create_package_for_arch(recipe, target_arch)?;
             println!("Package created: {}", package_path.display());
+
+
             package_paths.push(package_path);
         }
 
